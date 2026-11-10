@@ -69,7 +69,13 @@
       </div>
     </div>
 
-    <label for="zoom">৩. ছবি বড়/ছোট করুন</label>
+    <label for="mode">৩. কাটার পদ্ধতি</label>
+    <select id="mode">
+      <option value="manual" selected>ম্যানুয়াল (নিজে টেনে কাটুন)</option>
+      <option value="auto">স্বয়ংক্রিয় (মুখ শনাক্ত করে কাটুন)</option>
+    </select>
+
+    <label for="zoom">ছবি বড়/ছোট করুন</label>
     <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
 
     <button id="center" class="secondary">মাঝখানে আনুন</button>
@@ -111,6 +117,7 @@
   const customBox = $('customBox');
   const wmm = $('wmm'), hmm = $('hmm'), dpiInput = $('dpi');
   const zoomInput = $('zoom');
+  const modeSelect = $('mode');
   const centerBtn = $('center');
   const bgSelect = $('bg');
   const formatSelect = $('format');
@@ -200,6 +207,7 @@
         canvas.width = 0;
         render();
         centerImage();
+        if (modeSelect.value === 'auto') autoCrop();
       };
       image.onerror = () => { status.textContent = 'ছবিটি খোলা যায়নি। অন্য ছবি বেছে নিন।'; };
       image.src = reader.result;
@@ -239,6 +247,52 @@
     oy = h / 2 - (h / 2 - oy) * ratio;
     lastZoom = newZoom;
     render();
+  });
+
+  // Auto crop: finds the largest face (where the browser supports FaceDetector)
+  // and frames it. If no face is found, it centres the photo instead.
+  async function autoCrop() {
+    if (!img) return;
+    const w = canvas.width, h = canvas.height;
+    const base = Math.max(w / img.width, h / img.height);
+    let box = null;
+
+    if ('FaceDetector' in window) {
+      try {
+        const faces = await new FaceDetector({ fastMode: true }).detect(img);
+        if (faces.length) {
+          box = faces.reduce((a, b) =>
+            (b.boundingBox.width * b.boundingBox.height > a.boundingBox.width * a.boundingBox.height) ? b : a
+          ).boundingBox;
+        }
+      } catch (err) { box = null; }
+    }
+
+    if (box) {
+      // Make the face about half the frame height, with the face slightly above centre
+      const z = Math.min(3, Math.max(1, (h * 0.5 / box.height) / base));
+      zoomInput.value = z;
+      lastZoom = z;
+      const s = base * z;
+      const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+      ox = w / 2 - cx * s;
+      oy = h * 0.42 - cy * s;
+      render();
+      status.textContent = 'মুখ শনাক্ত করে ছবি কাটা হয়েছে। প্রয়োজন হলে টেনে ও স্লাইডার দিয়ে ঠিক করুন।';
+    } else {
+      zoomInput.value = 1;
+      lastZoom = 1;
+      centerImage();
+      status.textContent = 'মুখ শনাক্ত করা যায়নি, তাই ছবির মাঝখান ধরে কাটা হয়েছে। প্রয়োজনে ম্যানুয়ালে ঠিক করুন।';
+    }
+  }
+
+  modeSelect.addEventListener('change', () => {
+    if (modeSelect.value === 'auto') {
+      autoCrop();
+    } else {
+      status.textContent = 'ম্যানুয়াল মোড: ছবি টেনে সরান, স্লাইডার দিয়ে বড় করুন।';
+    }
   });
 
   centerBtn.addEventListener('click', () => { zoomInput.value = 1; lastZoom = 1; render(); centerImage(); });
