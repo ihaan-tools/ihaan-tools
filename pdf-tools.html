@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF টুলস | IHAAN Tools</title>
+<style>
+  :root { --navy:#14306B; --teal:#0E8F7E; --gold:#D98E1B; --bg:#F4F7FB; --text:#0A1A3D; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Noto Sans Bengali", "Hind Siliguri", Arial, sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--navy); color:#fff; padding:18px 16px; text-align:center; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:6px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:560px; margin:20px auto; padding:0 16px; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 10px rgba(0,0,0,.08); margin-bottom:16px; }
+  label { display:block; font-weight:bold; margin:12px 0 6px; }
+  select, input[type=file], input[type=text] { width:100%; padding:10px; border:1px solid #cfd8e3; border-radius:8px; font-size:15px; background:#fff; }
+  input[type=file][multiple] { padding:8px; }
+  button { width:100%; padding:12px; margin-top:14px; border:0; border-radius:10px; font-size:16px; font-weight:bold; color:#fff; background:var(--teal); cursor:pointer; }
+  button:disabled { background:#9aa6b5; cursor:not-allowed; }
+  .hidden { display:none; }
+  .privacy { font-size:13px; color:#0E6B5E; background:#E8F7F4; border-radius:10px; padding:10px 12px; }
+  .note { font-size:13px; line-height:1.6; color:#44546a; }
+  .status { font-size:14px; margin-top:12px; min-height:20px; color:#0A1A3D; }
+  .warn { font-size:13px; line-height:1.6; color:#8a5a00; background:#FFF6E0; border-radius:10px; padding:10px 12px; margin-top:10px; }
+  footer { text-align:center; font-size:12px; color:#6B7A90; padding:10px 16px 24px; line-height:1.6; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>PDF টুলস</h1>
+  <p>PDF কম্প্রেস, জোড়া, ভাগ ও ছবি থেকে PDF, সবকিছু এক জায়গায়</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="privacy">আপনার ফাইল কোনো সার্ভারে পাঠানো হয় না। সবকাজ আপনার ব্রাউজারেই হয়।</div>
+
+    <label for="tool">কোন কাজ করতে চান?</label>
+    <select id="tool">
+      <option value="compress" selected>PDF কম্প্রেস (ছোট করুন)</option>
+      <option value="merge">একাধিক PDF জোড়া দিন</option>
+      <option value="split">PDF থেকে নির্দিষ্ট পাতা বের করুন</option>
+      <option value="imgpdf">ছবি থেকে PDF বানান</option>
+    </select>
+  </div>
+
+  <!-- Compress -->
+  <div class="card" id="sec-compress">
+    <label for="cFile">PDF বেছে নিন</label>
+    <input type="file" id="cFile" accept="application/pdf">
+
+    <label for="cTarget">কত KB-এর মধ্যে আনতে চান?</label>
+    <select id="cTarget">
+      <option value="100">100 KB</option>
+      <option value="200">200 KB</option>
+      <option value="300">300 KB</option>
+      <option value="500" selected>500 KB</option>
+      <option value="1024">1 MB</option>
+      <option value="0">সর্বোচ্চ কম্প্রেশন</option>
+    </select>
+    <p class="warn">কম্প্রেশনে PDF-এর পাতাগুলো ছবি হয়ে যায়। ফলে লেখা আর নির্বাচন বা খোঁজা যাবে না। আবেদনের জন্য ফাইলের সাইজ কমানোর ক্ষেত্রে এটি সাধারণত ঠিক থাকে।</p>
+    <button id="cGo">কম্প্রেস করে ডাউনলোড করুন</button>
+  </div>
+
+  <!-- Merge -->
+  <div class="card hidden" id="sec-merge">
+    <label for="mFiles">PDF ফাইলগুলো বেছে নিন (ক্রম অনুযায়ী)</label>
+    <input type="file" id="mFiles" accept="application/pdf" multiple>
+    <p class="note">যে ক্রমে বাছবেন, সেই ক্রমেই জোড়া লাগবে।</p>
+    <button id="mGo">জোড়া দিয়ে ডাউনলোড করুন</button>
+  </div>
+
+  <!-- Split -->
+  <div class="card hidden" id="sec-split">
+    <label for="sFile">PDF বেছে নিন</label>
+    <input type="file" id="sFile" accept="application/pdf">
+    <label for="sRange">কোন পাতাগুলো চান?</label>
+    <input type="text" id="sRange" placeholder="যেমন: 1-3, 5, 8">
+    <p class="note">কমা দিয়ে আলাদা করুন। পাতা নম্বর ১ থেকে শুরু।</p>
+    <button id="sGo">পাতা বের করে ডাউনলোড করুন</button>
+  </div>
+
+  <!-- Images to PDF -->
+  <div class="card hidden" id="sec-imgpdf">
+    <label for="iFiles">ছবিগুলো বেছে নিন (ক্রম অনুযায়ী)</label>
+    <input type="file" id="iFiles" accept="image/*" multiple>
+    <p class="note">প্রতিটি ছবি একটি করে A4 পাতায় মাঝখানে বসবে।</p>
+    <button id="iGo">PDF বানিয়ে ডাউনলোড করুন</button>
+  </div>
+
+  <div class="card">
+    <div id="status" class="status">কাজ বেছে নিয়ে ফাইল দিন।</div>
+  </div>
+
+  <div class="card note">
+    <strong>দায়িত্ব:</strong> শুধু নিজের বা গ্রাহকের অনুমোদিত নথি ব্যবহার করুন। জাল বা নকল সরকারি নথি তৈরিতে এটি ব্যবহার করা যাবে না।
+  </div>
+</main>
+
+<footer>
+  এটি কোনো সরকারি ওয়েবসাইট নয়।<br>
+  ইহান অনলাইন সেন্টার, সোঁতসাল, বীরভূম | 03462-260425
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const status = (msg) => { $('status').textContent = msg; };
+
+  // Show only the chosen tool
+  $('tool').addEventListener('change', () => {
+    ['compress', 'merge', 'split', 'imgpdf'].forEach(t =>
+      $('sec-' + t).classList.toggle('hidden', $('tool').value !== t));
+    status('কাজ বেছে নিয়ে ফাইল দিন।');
+  });
+
+  function download(bytes, name, type = 'application/pdf') {
+    const blob = new Blob([bytes], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function readBytes(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(new Uint8Array(r.result));
+      r.onerror = reject;
+      r.readAsArrayBuffer(file);
+    });
+  }
+
+  function fmtKB(n) { return Math.round(n / 1024) + ' KB'; }
+
+  // ---------- Merge ----------
+  $('mGo').addEventListener('click', async () => {
+    const files = [...$('mFiles').files];
+    if (files.length < 2) return status('কমপক্ষে দুটি PDF বেছে নিন।');
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      for (let i = 0; i < files.length; i++) {
+        status(`জোড়া দেওয়া হচ্ছে ${i + 1}/${files.length}...`);
+        const src = await PDFLib.PDFDocument.load(await readBytes(files[i]), { ignoreEncryption: true });
+        const pages = await out.copyPages(src, src.getPageIndices());
+        pages.forEach(p => out.addPage(p));
+      }
+      download(await out.save(), 'joined.pdf');
+      status(`${files.length}টি PDF জোড়া দেওয়া হয়েছে।`);
+    } catch (e) { status('জোড়া দেওয়া যায়নি। ফাইলটি সুরক্ষিত বা নষ্ট হতে পারে।'); }
+  });
+
+  // ---------- Split (extract pages) ----------
+  function parseRanges(text, max) {
+    const set = new Set();
+    for (const part of text.split(',').map(s => s.trim()).filter(Boolean)) {
+      const m = part.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (m) {
+        for (let i = +m[1]; i <= +m[2]; i++) set.add(i);
+      } else if (/^\d+$/.test(part)) {
+        set.add(+part);
+      } else return null;
+    }
+    const list = [...set].filter(n => n >= 1 && n <= max).sort((a, b) => a - b);
+    return list.length ? list : null;
+  }
+
+  $('sGo').addEventListener('click', async () => {
+    const file = $('sFile').files[0];
+    if (!file) return status('একটি PDF বেছে নিন।');
+    try {
+      const src = await PDFLib.PDFDocument.load(await readBytes(file), { ignoreEncryption: true });
+      const list = parseRanges($('sRange').value, src.getPageCount());
+      if (!list) return status('পাতার নম্বর ঠিক করে লিখুন, যেমন 1-3, 5। নম্বর PDF-এর পাতার মধ্যে থাকতে হবে।');
+      const out = await PDFLib.PDFDocument.create();
+      const pages = await out.copyPages(src, list.map(n => n - 1));
+      pages.forEach(p => out.addPage(p));
+      download(await out.save(), 'extracted-pages.pdf');
+      status(`${list.length}টি পাতা বের করা হয়েছে।`);
+    } catch (e) { status('PDF খোলা যায়নি। ফাইলটি সুরক্ষিত বা নষ্ট হতে পারে।'); }
+  });
+
+  // ---------- Images to PDF ----------
+  function imageToJpeg(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const x = c.getContext('2d');
+        x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, c.width, c.height);
+        x.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        c.toBlob(async (blob) => resolve({ bytes: new Uint8Array(await blob.arrayBuffer()), w: c.width, h: c.height }), 'image/jpeg', 0.92);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+      img.src = url;
+    });
+  }
+
+  $('iGo').addEventListener('click', async () => {
+    const files = [...$('iFiles').files];
+    if (!files.length) return status('কমপক্ষে একটি ছবি বেছে নিন।');
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      const A4W = 595.28, A4H = 841.89, margin = 24;
+      for (let i = 0; i < files.length; i++) {
+        status(`ছবি যোগ হচ্ছে ${i + 1}/${files.length}...`);
+        const { bytes, w, h } = await imageToJpeg(files[i]);
+        const jpg = await out.embedJpg(bytes);
+        const page = out.addPage([A4W, A4H]);
+        const maxW = A4W - margin * 2, maxH = A4H - margin * 2;
+        const scale = Math.min(maxW / w, maxH / h);
+        const dw = w * scale, dh = h * scale;
+        page.drawImage(jpg, { x: (A4W - dw) / 2, y: (A4H - dh) / 2, width: dw, height: dh });
+      }
+      download(await out.save(), 'images.pdf');
+      status(`${files.length}টি ছবি দিয়ে PDF বানানো হয়েছে।`);
+    } catch (e) { status('কিছু ছবি যোগ করা যায়নি। JPG, PNG বা WEBP ফাইল ব্যবহার করুন।'); }
+  });
+
+  // ---------- Compress (rasterise pages to JPEG, retry until target size) ----------
+  async function compressOnce(pdfjsDoc, scale, quality) {
+    const out = await PDFLib.PDFDocument.create();
+    for (let p = 1; p <= pdfjsDoc.numPages; p++) {
+      const page = await pdfjsDoc.getPage(p);
+      const base = page.getViewport({ scale: 1 });
+      const vp = page.getViewport({ scale });
+      const c = document.createElement('canvas');
+      c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+      const x = c.getContext('2d');
+      x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: x, viewport: vp }).promise;
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+      const jpg = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      const pg = out.addPage([base.width, base.height]);
+      pg.drawImage(jpg, { x: 0, y: 0, width: base.width, height: base.height });
+    }
+    return await out.save();
+  }
+
+  $('cGo').addEventListener('click', async () => {
+    const file = $('cFile').files[0];
+    if (!file) return status('একটি PDF বেছে নিন।');
+    const targetKB = Number($('cTarget').value);
+    const targetBytes = targetKB * 1024;
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const data = await readBytes(file);
+      const doc = await pdfjsLib.getDocument({ data }).promise;
+      // Try from good quality to strong compression until the target is met
+      const steps = [
+        { scale: 1.5, q: 0.8 }, { scale: 1.3, q: 0.65 },
+        { scale: 1.1, q: 0.5 }, { scale: 1.0, q: 0.4 }, { scale: 0.9, q: 0.3 }
+      ];
+      let best = null;
+      for (let i = 0; i < steps.length; i++) {
+        status(`কম্প্রেস হচ্ছে... (ধাপ ${i + 1}/${steps.length})`);
+        const bytes = await compressOnce(doc, steps[i].scale, steps[i].q);
+        best = bytes;
+        if (targetKB === 0) continue; // max compression: keep going to the lowest step
+        if (bytes.length <= targetBytes) break;
+      }
+      const note = targetKB && best.length > targetBytes
+        ? ` টার্গেট ${targetKB} KB-তে পৌঁছানো যায়নি। সর্বনিম্ন মানের ফলাফল দেওয়া হয়েছে।`
+        : '';
+      download(best, 'compressed.pdf');
+      status(`কম্প্রেস শেষ। আকার: ${fmtKB(best.length)}।${note}`);
+    } catch (e) { status('PDF কম্প্রেস করা যায়নি। ফাইলটি সুরক্ষিত বা নষ্ট হতে পারে।'); }
+  });
+</script>
+</body>
+</html>
