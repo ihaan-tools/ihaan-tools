@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>পাসপোর্ট সাইজ ফটো রিসাইজার | IHAAN Tools</title>
+<style>
+  :root { --navy:#14306B; --teal:#0E8F7E; --gold:#D98E1B; --bg:#F4F7FB; --text:#0A1A3D; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Noto Sans Bengali", "Hind Siliguri", Arial, sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--navy); color:#fff; padding:18px 16px; text-align:center; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:6px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:520px; margin:20px auto; padding:0 16px; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 10px rgba(0,0,0,.08); margin-bottom:16px; }
+  label { display:block; font-weight:bold; margin:10px 0 6px; }
+  select, input[type=file] { width:100%; padding:10px; border:1px solid #cfd8e3; border-radius:8px; font-size:15px; background:#fff; }
+  button { width:100%; padding:12px; margin-top:12px; border:0; border-radius:10px; font-size:16px; font-weight:bold; color:#fff; background:var(--teal); cursor:pointer; }
+  button:disabled { background:#9aa6b5; cursor:not-allowed; }
+  .preview { text-align:center; }
+  canvas { max-width:100%; height:auto; border:1px dashed var(--gold); background:#fff; }
+  .note { font-size:13px; line-height:1.6; color:#44546a; }
+  .privacy { font-size:13px; color:#0E6B5E; background:#E8F7F4; border-radius:10px; padding:10px 12px; }
+  footer { text-align:center; font-size:12px; color:#6B7A90; padding:10px 16px 24px; line-height:1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>পাসপোর্ট সাইজ ফটো রিসাইজার</h1>
+  <p>ছবি কেটে নির্দিষ্ট মাপে তৈরি করুন</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="privacy">আপনার ছবি কোনো সার্ভারে পাঠানো হয় না। সবকিছু আপনার ব্রাউজারেই হয়।</div>
+
+    <label for="file">১. ছবি বেছে নিন</label>
+    <input type="file" id="file" accept="image/*">
+
+    <label for="size">২. মাপ বেছে নিন</label>
+    <select id="size">
+      <option value="330x420" selected>পাসপোর্ট সাইজ (3.5 × 4.5 সেমি, 300 DPI)</option>
+      <option value="413x531">স্ট্যাম্প সাইজ (35 × 45 মিমি, এই মাপ থেকে নিয়ে নিন)</option>
+      <option value="390x472">চাকরি ফর্ম (3.3 × 4 সেমি)</option>
+    </select>
+
+    <label for="bg">৩. পটভূমি</label>
+    <select id="bg">
+      <option value="#FFFFFF" selected>সাদা</option>
+      <option value="transparent">স্বচ্ছ (PNG)</option>
+    </select>
+
+    <button id="download" disabled>ছবি ডাউনলোড করুন</button>
+  </div>
+
+  <div class="card preview">
+    <canvas id="canvas" width="330" height="420"></canvas>
+    <p class="note" id="status">প্রথমে একটি ছবি বেছে নিন। ছবির মুখ মাঝখানে রাখুন।</p>
+  </div>
+
+  <div class="card note">
+    <strong>নির্দেশনা:</strong> ছবি স্পষ্ট ও সামনের দিক থেকে তোলা হতে হবে। সরকারি আবেদনের নির্দিষ্ট মাপ ও ফাইল সাইজের নিয়ম আবেদনের পোর্টালে আগে যাচাই করে নিন।
+  </div>
+</main>
+
+<footer>
+  এটি কোনো সরকারি ওয়েবসাইট নয়।<br>
+  ইহান অনলাইন সেন্টার, সোঁতসাল, বীরভূম | 03462-260425
+</footer>
+
+<script>
+  const fileInput = document.getElementById('file');
+  const sizeSelect = document.getElementById('size');
+  const bgSelect = document.getElementById('bg');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const downloadBtn = document.getElementById('download');
+  const status = document.getElementById('status');
+
+  let sourceImage = null;
+
+  function drawPhoto() {
+    if (!sourceImage) return;
+    const [w, h] = sizeSelect.value.split('x').map(Number);
+    canvas.width = w;
+    canvas.height = h;
+
+    // Background
+    ctx.clearRect(0, 0, w, h);
+    if (bgSelect.value !== 'transparent') {
+      ctx.fillStyle = bgSelect.value;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Centre-crop the photo to the target aspect ratio
+    const targetRatio = w / h;
+    const imgRatio = sourceImage.width / sourceImage.height;
+    let sx = 0, sy = 0, sw = sourceImage.width, sh = sourceImage.height;
+    if (imgRatio > targetRatio) {
+      sw = sourceImage.height * targetRatio;
+      sx = (sourceImage.width - sw) / 2;
+    } else {
+      sh = sourceImage.width / targetRatio;
+      sy = (sourceImage.height - sh) / 3; // keep a little more headroom
+    }
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(sourceImage, sx, sy, sw, sh, 0, 0, w, h);
+    downloadBtn.disabled = false;
+    status.textContent = 'ছবিটি তৈরি হয়েছে। প্রয়োজনে মাপ বদলে নিন।';
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => { sourceImage = img; drawPhoto(); };
+      img.onerror = () => { status.textContent = 'ছবিটি খোলা যায়নি। অন্য ছবি বেছে নিন।'; };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  sizeSelect.addEventListener('change', drawPhoto);
+  bgSelect.addEventListener('change', drawPhoto);
+
+  downloadBtn.addEventListener('click', () => {
+    const isPng = bgSelect.value === 'transparent';
+    const link = document.createElement('a');
+    link.download = isPng ? 'passport-photo.png' : 'passport-photo.jpg';
+    link.href = isPng
+      ? canvas.toDataURL('image/png')
+      : canvas.toDataURL('image/jpeg', 0.92);
+    link.click();
+  });
+</script>
+</body>
+</html>
