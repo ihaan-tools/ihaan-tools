@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PVC কার্ড সাইজ মেকার | IHAAN Tools</title>
+<style>
+  :root { --navy:#14306B; --teal:#0E8F7E; --gold:#D98E1B; --bg:#F4F7FB; --text:#0A1A3D; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Noto Sans Bengali", "Hind Siliguri", Arial, sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--navy); color:#fff; padding:18px 16px; text-align:center; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:6px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:520px; margin:20px auto; padding:0 16px; }
+  .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 10px rgba(0,0,0,.08); margin-bottom:16px; }
+  label { display:block; font-weight:bold; margin:12px 0 6px; }
+  select, input[type=file] { width:100%; padding:10px; border:1px solid #cfd8e3; border-radius:8px; font-size:15px; background:#fff; }
+  input[type=range] { width:100%; }
+  button { width:100%; padding:12px; margin-top:12px; border:0; border-radius:10px; font-size:16px; font-weight:bold; color:#fff; background:var(--teal); cursor:pointer; }
+  button.secondary { background:#fff; color:var(--navy); border:1px solid var(--navy); }
+  button:disabled { background:#9aa6b5; cursor:not-allowed; }
+  .preview { text-align:center; }
+  canvas { display:block; margin:0 auto; width:100%; max-width:340px; height:auto; border:1px dashed var(--gold); background:#fff; touch-action:none; cursor:grab; }
+  .note { font-size:13px; line-height:1.6; color:#44546a; }
+  .privacy { font-size:13px; color:#0E6B5E; background:#E8F7F4; border-radius:10px; padding:10px 12px; }
+  footer { text-align:center; font-size:12px; color:#6B7A90; padding:10px 16px 24px; line-height:1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>PVC কার্ড সাইজ মেকার</h1>
+  <p>ছবি বা ডিজাইন ক্রেডিট-কার্ড মাপে (85.6 × 54 মিমি) সাজান</p>
+</header>
+
+<main>
+  <div class="card">
+    <div class="privacy">আপনার ছবি কোনো সার্ভারে পাঠানো হয় না। সবকিছু আপনার ব্রাউজারেই হয়।</div>
+
+    <label for="file">১. ছবি বেছে নিন</label>
+    <input type="file" id="file" accept="image/*">
+
+    <label for="mode">২. কাটার পদ্ধতি</label>
+    <select id="mode">
+      <option value="fill" selected>পুরো কার্ড ভরে (ছবি টেনে সরান)</option>
+      <option value="fit">পুরো ছবি দেখান (ফাঁকা জায়গা সাদা)</option>
+    </select>
+
+    <label for="zoom">ছবি বড়/ছোট করুন</label>
+    <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
+
+    <button id="center" class="secondary">মাঝখানে আনুন</button>
+
+    <label for="layout">৩. আউটপুট</label>
+    <select id="layout">
+      <option value="single" selected>একটি কার্ড (JPG)</option>
+      <option value="sheet">A4 শিটে ১০টি কার্ড, প্রিন্টের জন্য (JPG)</option>
+    </select>
+
+    <button id="download" disabled>ডাউনলোড করুন</button>
+  </div>
+
+  <div class="card preview">
+    <canvas id="canvas" width="1012" height="638"></canvas>
+    <p class="note" id="status">প্রথমে একটি ছবি বেছে নিন।</p>
+  </div>
+
+  <div class="card note">
+    <strong>প্রিন্ট করার নিয়ম:</strong> ছাপার সময় প্রিন্টারে "Actual size" বা "100%" বেছে নিন, "Fit to page" নয়। ফটো পেপার বা PVC-র জন্য উপযুক্ত মিডিয়া বেছে নিন।<br><br>
+    <strong>দায়িত্ব:</strong> শুধু নিজের বা গ্রাহকের অনুমোদিত ছবি ও ডিজাইন ব্যবহার করুন। সরকারি কার্ডের নকল বা জাল তৈরিতে এটি ব্যবহার করা যাবে না।
+  </div>
+</main>
+
+<footer>
+  এটি কোনো সরকারি ওয়েবসাইট নয়।<br>
+  ইহান অনলাইন সেন্টার, সোঁতসাল, বীরভূম | 03462-260425
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const fileInput = $('file'), modeSelect = $('mode'), zoomInput = $('zoom');
+  const centerBtn = $('center'), layoutSelect = $('layout'), downloadBtn = $('download');
+  const canvas = $('canvas'), ctx = canvas.getContext('2d'), status = $('status');
+
+  // CR-80 card size at 300 DPI
+  const CARD_W = 1012, CARD_H = 638;
+  // A4 at 300 DPI
+  const A4_W = 2480, A4_H = 3508;
+
+  let img = null, ox = 0, oy = 0, lastZoom = 1;
+  let dragging = false, lastX = 0, lastY = 0;
+
+  function baseScale() {
+    if (modeSelect.value === 'fit') return Math.min(CARD_W / img.width, CARD_H / img.height);
+    return Math.max(CARD_W / img.width, CARD_H / img.height);
+  }
+
+  function drawSize() {
+    const s = baseScale() * Number(zoomInput.value);
+    return [img.width * s, img.height * s];
+  }
+
+  function clamp() {
+    const [dw, dh] = drawSize();
+    if (modeSelect.value === 'fit') {
+      ox = (CARD_W - dw) / 2; oy = (CARD_H - dh) / 2;
+      return;
+    }
+    ox = Math.min(0, Math.max(CARD_W - dw, ox));
+    oy = Math.min(0, Math.max(CARD_H - dh, oy));
+  }
+
+  function centre() {
+    const [dw, dh] = drawSize();
+    ox = (CARD_W - dw) / 2; oy = (CARD_H - dh) / 2;
+    render();
+  }
+
+  // Paint one card onto any canvas context at (x, y)
+  function paintCard(c, x, y) {
+    c.save();
+    c.beginPath();
+    c.rect(x, y, CARD_W, CARD_H);
+    c.clip();
+    c.fillStyle = '#FFFFFF';
+    c.fillRect(x, y, CARD_W, CARD_H);
+    const [dw, dh] = drawSize();
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(img, x + ox, y + oy, dw, dh);
+    c.restore();
+  }
+
+  function render() {
+    if (!img) return;
+    clamp();
+    ctx.clearRect(0, 0, CARD_W, CARD_H);
+    paintCard(ctx, 0, 0);
+    downloadBtn.disabled = false;
+    status.textContent = 'পূর্বরূপ দেখুন। ছবিটি টেনে সরাতে পারেন।';
+  }
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => { img = image; zoomInput.value = 1; lastZoom = 1; centre(); };
+      image.onerror = () => { status.textContent = 'ছবিটি খোলা যায়নি। অন্য ছবি বেছে নিন।'; };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!img || modeSelect.value === 'fit') return;
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const scale = CARD_W / canvas.clientWidth;
+    ox += (e.clientX - lastX) * scale;
+    oy += (e.clientY - lastY) * scale;
+    lastX = e.clientX; lastY = e.clientY;
+    render();
+  });
+  const endDrag = () => { dragging = false; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
+  zoomInput.addEventListener('input', () => {
+    if (!img) return;
+    const newZoom = Number(zoomInput.value);
+    const ratio = newZoom / lastZoom;
+    ox = CARD_W / 2 - (CARD_W / 2 - ox) * ratio;
+    oy = CARD_H / 2 - (CARD_H / 2 - oy) * ratio;
+    lastZoom = newZoom;
+    render();
+  });
+
+  centerBtn.addEventListener('click', () => { zoomInput.value = 1; lastZoom = 1; centre(); });
+  modeSelect.addEventListener('change', () => { if (img) { zoomInput.value = 1; lastZoom = 1; centre(); } });
+
+  downloadBtn.addEventListener('click', () => {
+    if (!img) return;
+    const link = document.createElement('a');
+    if (layoutSelect.value === 'single') {
+      link.download = 'pvc-card.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+    } else {
+      // A4 sheet: 2 columns x 5 rows of cards with a thin cut guide around each
+      const sheet = document.createElement('canvas');
+      sheet.width = A4_W; sheet.height = A4_H;
+      const s = sheet.getContext('2d');
+      s.fillStyle = '#FFFFFF';
+      s.fillRect(0, 0, A4_W, A4_H);
+      const gap = 30; // about 2.5 mm
+      const gridW = 2 * CARD_W + gap, gridH = 5 * CARD_H + 4 * gap;
+      const startX = Math.round((A4_W - gridW) / 2), startY = Math.round((A4_H - gridH) / 2);
+      for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 2; col++) {
+          const x = startX + col * (CARD_W + gap);
+          const y = startY + row * (CARD_H + gap);
+          paintCard(s, x, y);
+          s.strokeStyle = '#B0B7C3';
+          s.lineWidth = 2;
+          s.setLineDash([10, 8]);
+          s.strokeRect(x, y, CARD_W, CARD_H);
+          s.setLineDash([]);
+        }
+      }
+      link.download = 'pvc-cards-a4.jpg';
+      link.href = sheet.toDataURL('image/jpeg', 0.95);
+    }
+    link.click();
+  });
+</script>
+</body>
+</html>
