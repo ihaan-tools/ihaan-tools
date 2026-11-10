@@ -15,13 +15,15 @@
   .card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 2px 10px rgba(0,0,0,.08); margin-bottom:16px; }
   label { display:block; font-weight:bold; margin:12px 0 6px; }
   select, input[type=file], input[type=number] { width:100%; padding:10px; border:1px solid #cfd8e3; border-radius:8px; font-size:15px; background:#fff; }
+  input[type=range] { width:100%; }
   .row { display:flex; gap:10px; }
   .row > div { flex:1; }
   .hidden { display:none; }
-  button { width:100%; padding:12px; margin-top:14px; border:0; border-radius:10px; font-size:16px; font-weight:bold; color:#fff; background:var(--teal); cursor:pointer; }
+  button { width:100%; padding:12px; margin-top:12px; border:0; border-radius:10px; font-size:16px; font-weight:bold; color:#fff; background:var(--teal); cursor:pointer; }
+  button.secondary { background:#fff; color:var(--navy); border:1px solid var(--navy); }
   button:disabled { background:#9aa6b5; cursor:not-allowed; }
   .preview { text-align:center; }
-  canvas { max-width:100%; height:auto; border:1px dashed var(--gold); background:#fff; }
+  canvas { display:block; margin:0 auto; width:100%; max-width:300px; height:auto; border:1px dashed var(--gold); background:#fff; touch-action:none; cursor:grab; }
   .note { font-size:13px; line-height:1.6; color:#44546a; }
   .privacy { font-size:13px; color:#0E6B5E; background:#E8F7F4; border-radius:10px; padding:10px 12px; }
   footer { text-align:center; font-size:12px; color:#6B7A90; padding:10px 16px 24px; line-height:1.6; }
@@ -30,7 +32,7 @@
 <body>
 <header>
   <h1>ফটো রিসাইজার</h1>
-  <p>ছবি কেটে নির্দিষ্ট মাপে তৈরি করুন</p>
+  <p>ছবি সরিয়ে ও বড় করে নির্দিষ্ট মাপে তৈরি করুন</p>
 </header>
 
 <main>
@@ -65,16 +67,20 @@
           <input type="number" id="dpi" value="300" min="72" max="600" step="1">
         </div>
       </div>
-      <p class="note">সাধারণত ফর্মের নির্দেশনায় যে মাপ লেখা থাকে, সেটিই লিখুন। DPI না জানলে 300 রাখুন।</p>
     </div>
 
-    <label for="bg">৩. পটভূমি</label>
+    <label for="zoom">৩. ছবি বড়/ছোট করুন</label>
+    <input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
+
+    <button id="center" class="secondary">মাঝখানে আনুন</button>
+
+    <label for="bg">৪. পটভূমি</label>
     <select id="bg">
       <option value="#FFFFFF" selected>সাদা</option>
       <option value="transparent">স্বচ্ছ (PNG)</option>
     </select>
 
-    <label for="format">৪. ফাইলের ধরন</label>
+    <label for="format">৫. ফাইলের ধরন</label>
     <select id="format">
       <option value="jpg" selected>JPG</option>
       <option value="png">PNG</option>
@@ -85,11 +91,11 @@
 
   <div class="card preview">
     <canvas id="canvas" width="330" height="420"></canvas>
-    <p class="note" id="status">প্রথমে একটি ছবি বেছে নিন। ছবির মুখ মাঝখানে রাখুন।</p>
+    <p class="note" id="status">প্রথমে একটি ছবি বেছে নিন। তারপর ছবিটি আঙুল বা মাউস দিয়ে টেনে সরান।</p>
   </div>
 
   <div class="card note">
-    <strong>নির্দেশনা:</strong> ছবি স্পষ্ট ও সামনের দিক থেকে তোলা হতে হবে। সরকারি আবেদনের নির্দিষ্ট মাপ, ফাইল সাইজ ও ফরম্যাটের নিয়ম আবেদনের পোর্টালে আগে যাচাই করে নিন।
+    <strong>নির্দেশনা:</strong> মুখ ফ্রেমের মাঝখানে ও মাথার উপরে সামান্য জায়গা রাখুন। ছবি স্পষ্ট ও সামনের দিক থেকে তোলা হতে হবে। সরকারি আবেদনের মাপ, ফাইল সাইজ ও ফরম্যাটের নিয়ম আবেদনের পোর্টালে আগে যাচাই করে নিন।
   </div>
 </main>
 
@@ -99,22 +105,25 @@
 </footer>
 
 <script>
-  const fileInput = document.getElementById('file');
-  const presetSelect = document.getElementById('preset');
-  const customBox = document.getElementById('customBox');
-  const wmm = document.getElementById('wmm');
-  const hmm = document.getElementById('hmm');
-  const dpiInput = document.getElementById('dpi');
-  const bgSelect = document.getElementById('bg');
-  const formatSelect = document.getElementById('format');
-  const canvas = document.getElementById('canvas');
+  const $ = (id) => document.getElementById(id);
+  const fileInput = $('file');
+  const presetSelect = $('preset');
+  const customBox = $('customBox');
+  const wmm = $('wmm'), hmm = $('hmm'), dpiInput = $('dpi');
+  const zoomInput = $('zoom');
+  const centerBtn = $('center');
+  const bgSelect = $('bg');
+  const formatSelect = $('format');
+  const canvas = $('canvas');
   const ctx = canvas.getContext('2d');
-  const downloadBtn = document.getElementById('download');
-  const status = document.getElementById('status');
+  const downloadBtn = $('download');
+  const status = $('status');
 
-  let sourceImage = null;
+  let img = null;          // loaded source image
+  let ox = 0, oy = 0;      // image top-left position on canvas (canvas pixels)
+  let dragging = false, lastX = 0, lastY = 0;
 
-  // Returns [width, height] in pixels for the current selection
+  // Target size in pixels for the current selection
   function targetSize() {
     if (presetSelect.value !== 'custom') {
       return presetSelect.value.split('x').map(Number);
@@ -125,66 +134,129 @@
     return [Math.round(w / 25.4 * dpi), Math.round(h / 25.4 * dpi)];
   }
 
-  function drawPhoto() {
-    if (!sourceImage) return;
+  // Size of the drawn image at the current zoom
+  function drawSize(w, h) {
+    const base = Math.max(w / img.width, h / img.height); // always covers the frame
+    const s = base * Number(zoomInput.value);
+    return [img.width * s, img.height * s];
+  }
+
+  // Keep the image covering the whole frame (no empty edges)
+  function clamp(w, h) {
+    const [dw, dh] = drawSize(w, h);
+    ox = Math.min(0, Math.max(w - dw, ox));
+    oy = Math.min(0, Math.max(h - dh, oy));
+  }
+
+  function centerImage() {
+    if (!img) return;
+    const [w, h] = [canvas.width, canvas.height];
+    const [dw, dh] = drawSize(w, h);
+    ox = (w - dw) / 2;
+    oy = (h - dh) / 2;
+    render();
+  }
+
+  function render() {
+    if (!img) return;
     const [w, h] = targetSize();
     if (w > 4000 || h > 4000) {
       status.textContent = 'মাপ খুব বড় হয়ে গেছে। মিমি বা DPI কমান।';
       downloadBtn.disabled = true;
       return;
     }
-    canvas.width = w;
-    canvas.height = h;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+      centerImage();
+      return;
+    }
+    clamp(w, h);
+    const [dw, dh] = drawSize(w, h);
 
     ctx.clearRect(0, 0, w, h);
     if (bgSelect.value !== 'transparent') {
       ctx.fillStyle = bgSelect.value;
       ctx.fillRect(0, 0, w, h);
     }
-
-    // Centre-crop to the target aspect ratio, keeping a little extra headroom
-    const targetRatio = w / h;
-    const imgRatio = sourceImage.width / sourceImage.height;
-    let sx = 0, sy = 0, sw = sourceImage.width, sh = sourceImage.height;
-    if (imgRatio > targetRatio) {
-      sw = sourceImage.height * targetRatio;
-      sx = (sourceImage.width - sw) / 2;
-    } else {
-      sh = sourceImage.width / targetRatio;
-      sy = (sourceImage.height - sh) / 3;
-    }
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(sourceImage, sx, sy, sw, sh, 0, 0, w, h);
+    ctx.drawImage(img, ox, oy, dw, dh);
 
     downloadBtn.disabled = false;
-    status.textContent = `ছবিটি তৈরি হয়েছে (${w} × ${h} পিক্সেল)।`;
+    status.textContent = `ছবিটি ${w} × ${h} পিক্সেল। টেনে সরান, স্লাইডার দিয়ে বড় করুন।`;
   }
 
-  function onPresetChange() {
-    customBox.classList.toggle('hidden', presetSelect.value !== 'custom');
-    drawPhoto();
-  }
-
+  // Load image
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const img = new Image();
-      img.onload = () => { sourceImage = img; drawPhoto(); };
-      img.onerror = () => { status.textContent = 'ছবিটি খোলা যায়নি। অন্য ছবি বেছে নিন।'; };
-      img.src = reader.result;
+      const image = new Image();
+      image.onload = () => {
+        img = image;
+        zoomInput.value = 1;
+        lastZoom = 1;
+        canvas.width = 0;
+        render();
+        centerImage();
+      };
+      image.onerror = () => { status.textContent = 'ছবিটি খোলা যায়নি। অন্য ছবি বেছে নিন।'; };
+      image.src = reader.result;
     };
     reader.readAsDataURL(file);
   });
 
-  presetSelect.addEventListener('change', onPresetChange);
-  [wmm, hmm, dpiInput, bgSelect].forEach(el => el.addEventListener('input', drawPhoto));
-  bgSelect.addEventListener('change', drawPhoto);
+  // Drag to move (mouse + touch via pointer events)
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!img) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = 'grabbing';
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const scale = canvas.width / canvas.clientWidth;
+    ox += (e.clientX - lastX) * scale;
+    oy += (e.clientY - lastY) * scale;
+    lastX = e.clientX; lastY = e.clientY;
+    render();
+  });
+  const endDrag = () => { dragging = false; canvas.style.cursor = 'grab'; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 
-  // If background is transparent, PNG is the only format that keeps it
+  // Zoom keeps the centre of the frame in place
+  let lastZoom = 1;
+  zoomInput.addEventListener('input', () => {
+    if (!img) return;
+    const newZoom = Number(zoomInput.value);
+    const ratio = newZoom / lastZoom;
+    const w = canvas.width, h = canvas.height;
+    // Scale the offset around the frame centre so the middle stays put
+    ox = w / 2 - (w / 2 - ox) * ratio;
+    oy = h / 2 - (h / 2 - oy) * ratio;
+    lastZoom = newZoom;
+    render();
+  });
+
+  centerBtn.addEventListener('click', () => { zoomInput.value = 1; lastZoom = 1; render(); centerImage(); });
+
+  presetSelect.addEventListener('change', () => {
+    customBox.classList.toggle('hidden', presetSelect.value !== 'custom');
+    if (!img) return;
+    canvas.width = 0; // force re-centre on new size
+    render();
+  });
+  [wmm, hmm, dpiInput].forEach(el => el.addEventListener('input', () => {
+    if (!img) return;
+    canvas.width = 0;
+    render();
+  }));
   bgSelect.addEventListener('change', () => {
     if (bgSelect.value === 'transparent') formatSelect.value = 'png';
+    render();
   });
 
   downloadBtn.addEventListener('click', () => {
